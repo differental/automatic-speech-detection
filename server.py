@@ -84,8 +84,64 @@ all_speech_probs = []
 recording = False
 BOUNDARY = 0.3 # needs adjusting per device/scenario
 
+final_result = ""
+final_result_lock = threading.Lock()
+
+calc_result5_started = 0
+calc_result5_finished = 0
+calc_result5_started_lock = threading.Lock()
+calc_result5_finished_lock = threading.Lock()
+
+calc_result10_started = 0
+calc_result10_finished = 0
+calc_result10_started_lock = threading.Lock()
+calc_result10_finished_lock = threading.Lock()
+
+count_5 = 0
+count_10 = 0
+
+def calc_result5():
+    global final_result, calc_result5_started, calc_result5_finished
+    
+    with calc_result5_started_lock:
+        temp = calc_result5_started
+        calc_result5_started += 1
+    
+    filename = "test5-" + str(count_5) + ".wav"
+    result = pipe(filename)
+    
+    while calc_result5_finished < temp:
+        continue
+    
+    with final_result_lock:
+        final_result += result["text"]
+    
+    with calc_result5_finished_lock:
+        calc_result5_finished += 1
+
+
+def calc_result10():
+    global final_result, calc_result10_started, calc_result10_finished
+    
+    with calc_result10_started_lock:
+        temp = calc_result10_started
+        calc_result10_started += 1
+        
+    filename = "test10-" + str(count_10) + ".wav"
+    result = pipe(filename)
+    
+    while calc_result10_finished < temp:
+        continue
+    
+    with final_result_lock:
+        final_result += result["text"]
+    
+    with calc_result10_finished_lock:
+        calc_result10_finished += 1
+
+
 def audio_recording():
-    global frames5, frames10, all_frames, all_speech_probs, recording
+    global frames5, frames10, all_frames, all_speech_probs, recording, count_5, count_10
     audio = pyaudio.PyAudio()
     stream = audio.open(format=FORMAT, channels=CHANNELS,
                         rate=RATE, input=True,
@@ -108,7 +164,6 @@ def audio_recording():
 
         if len(frames5) == 10:
             frames5_data = b''.join(frames5)
-            frames5 = []
             numbers = [int.from_bytes(frames5_data[i:i+2], byteorder='little', signed=False) for i in range(0, len(frames5_data), 2)]
 
             # Normalize integers to range between 0 and 2
@@ -133,10 +188,23 @@ def audio_recording():
             
             if max(speech_probs[:10]) <= BOUNDARY:
                 stop_recording()
+            
+            count_5 += 1
+            
+            filename = "test5-" + str(count_5) + ".wav"
+            
+            wf = wave.open(filename, 'wb')
+            wf.setnchannels(CHANNELS)
+            wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
+            wf.setframerate(RATE)
+            wf.writeframes(b''.join(frames5))
+            wf.close()
+            threading.Thread(target=calc_result5).start()
+            frames5 = []
+            
  
         if len(frames10) == 10:
             frames10_data = b''.join(frames10)
-            frames10 = []
             numbers = [int.from_bytes(frames10_data[i:i+2], byteorder='little', signed=False) for i in range(0, len(frames10_data), 2)]
 
             # Normalize integers to range between 0 and 2
@@ -161,6 +229,18 @@ def audio_recording():
             
             if max(speech_probs[:10]) <= BOUNDARY:
                 stop_recording()
+            
+            count_10 += 1
+            filename = "test10-" + str(count_10) + ".wav"
+                
+            wf = wave.open(filename, 'wb')
+            wf.setnchannels(CHANNELS)
+            wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
+            wf.setframerate(RATE)
+            wf.writeframes(b''.join(frames10))
+            wf.close()
+            threading.Thread(target=calc_result10).start()
+            frames10 = []
 
 @app.route('/')
 def index():
@@ -178,7 +258,19 @@ def start_recording():
 @socketio.on('stop_recording')
 def stop_recording():
     #global frames5, frames10, all_frames, all_speech_probs, recording
+    global recording
     print("Recording stopped...")
+    recording = False
+    
+    while calc_result10_started != calc_result10_finished:
+        continue
+    
+    while calc_result5_started != calc_result5_finished:
+        continue
+    
+    print(final_result)
+    
+    
     filename = 'recording_all.wav'
     wf = wave.open(filename, 'wb')
     wf.setnchannels(CHANNELS)
@@ -189,10 +281,11 @@ def stop_recording():
     
     result = pipe("recording_all.wav")
     print(result['text'])
-    recording = False
     #emit('audio_saved', {'filename': filename})
     #plt.plot([i for i in range(len(all_speech_probs))], all_speech_probs)
     #plt.show()
+    
+
 
 
 if __name__ == '__main__':

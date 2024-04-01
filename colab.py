@@ -1,7 +1,10 @@
+#!apt install portaudio19-dev
+#!pip install pyaudio wave torch matplotlib numpy transformers accelerate
+# Restart runtime after installing accelerate
+
 import pyaudio
 import wave
 import threading
-
 import torch
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 

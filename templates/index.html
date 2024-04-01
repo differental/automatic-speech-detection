@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Recorder</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.2/socket.io.js"></script>
+    <script>
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+        function startRecording() {
+            socket.emit('start_recording');
+        }
+        function stopRecording() {
+            socket.emit('stop_recording');
+        }
+        socket.on('audio_saved', function(data) {
+            alert('Audio saved as ' + data.filename);
+        });
+    </script>
+</head>
+<body>
+    <h1>Audio Recorder</h1>
+    <button onclick="startRecording()">Start Recording</button>
+    <button onclick="stopRecording()">Stop Recording</button>
+</body>
+</html>
+

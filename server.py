@@ -72,9 +72,11 @@ CHUNK = 1536
 
 # Overflow issues: time-stuff
 
-# A100 might be slow at the start, wait patiently
+
 
 # Next problem: more real-world 
+
+
 
 
 frames5 = []
@@ -97,6 +99,7 @@ def audio_recording():
         all_frames.append(data)
         #frames5.append(data) #frames5: 6-15, 16-25, 26-35, 36-45, ...
         frames10.append(data) #frames10: 1-10, 11-20, 21-30, 31-40, ...
+
         
         if not recording:
             continue
@@ -107,8 +110,22 @@ def audio_recording():
 
         if len(frames5) == 10:
             start = time.time()
+
+            # measure latency of this
+            
+            #wf = wave.open("test5.wav", 'wb')
+            #wf.setnchannels(CHANNELS)
+            #wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
+            #wf.setframerate(RATE)
+            #wf.writeframes(b''.join(frames5))
+            #wf.close()
+            #print('audio saved 5')
+
             frames5_data = b''.join(frames5)
+            #print(frames5_data)
+            
             frames5 = []
+            
             numbers = [int.from_bytes(frames5_data[i:i+2], byteorder='little', signed=False) for i in range(0, len(frames5_data), 2)]
 
             # Normalize integers to range between 0 and 2
@@ -120,7 +137,14 @@ def audio_recording():
 
             end = time.time()
             print(end-start)
-            
+
+            # it's possible to plug numpy arrays to make the two match. figure
+            # out this (if 20-30ms)
+            # A100 might be slow at the start, wait patiently
+
+            #wav = read_audio('test5.wav', sampling_rate=16000)
+            #print(wav)
+            #wav = read_audio_from_bytes(frames5_data, sampling_rate=16000)
             window_size_samples = 1536
             speech_probs = []
             for i in range(0, len(wav), window_size_samples):
@@ -133,6 +157,9 @@ def audio_recording():
             all_speech_probs += speech_probs[:10]
             #print(speech_probs)
 
+            #end = time.time()
+            #print(end-start)
+
             flag=True
             for i in speech_probs[:10]:
                 if i > 0.01:
@@ -143,19 +170,20 @@ def audio_recording():
  
         if len(frames10) == 10:
             start = time.time()
-            frames10_data = b''.join(frames10)
+            wf = wave.open("test10.wav", 'wb')
+            wf.setnchannels(CHANNELS)
+            wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
+            wf.setframerate(RATE)
+            wf.writeframes(b''.join(frames10))
+            wf.close()
+            #print('audio saved 10')
             frames10 = []
-            numbers = [int.from_bytes(frames10_data[i:i+2], byteorder='little', signed=False) for i in range(0, len(frames10_data), 2)]
 
-            # Normalize integers to range between 0 and 2
-            max_val = max(numbers)
-            min_val = min(numbers)
-            normalized_numbers = [(num - min_val) * 2 / (max_val - min_val) for num in numbers]
-
-            wav = torch.tensor(normalized_numbers, dtype=torch.float32)
-
+            wav = read_audio('test10.wav', sampling_rate=16000)
+            
             end = time.time()
             print(end-start)
+            
             
             window_size_samples = 1536
             speech_probs = []
@@ -190,7 +218,7 @@ def start_recording():
 
 @socketio.on('stop_recording')
 def stop_recording():
-    #global frames5, frames10, all_frames, all_speech_probs, recording
+    global frames5, frames10, all_frames, all_speech_probs, recording
     print("Recording stopped...")
     filename = 'recording_all.wav'
     wf = wave.open(filename, 'wb')

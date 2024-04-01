@@ -1,3 +1,4 @@
 pyvenv/
 *.wav
+__pycache__/
 

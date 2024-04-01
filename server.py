@@ -6,10 +6,35 @@ import threading
 # ---
 import torch
 import matplotlib.pyplot as plt
+import time
+import numpy as np
+import io
 
-import whisper
+from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
-model_whisper = whisper.load_model("tiny")
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
+torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+
+model_id = "distil-whisper/distil-medium.en"
+
+model_whisper = AutoModelForSpeechSeq2Seq.from_pretrained(
+    model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True
+)
+model_whisper.to(device)
+
+processor = AutoProcessor.from_pretrained(model_id)
+
+pipe = pipeline(
+    "automatic-speech-recognition",
+    model=model_whisper,
+    tokenizer=processor.tokenizer,
+    feature_extractor=processor.feature_extractor,
+    max_new_tokens=128,
+    torch_dtype=torch_dtype,
+    device=device,
+)
+
+# ---
 
 model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
                               model='silero_vad',
@@ -28,8 +53,8 @@ socketio = SocketIO(app)
 
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
-RATE = 44100
-CHUNK = 1024
+RATE = 16000
+CHUNK = 1536
 
 #1 frame: 1024/44100=23ms
 #10 frames together, send in 5 frame intervals (1-10, 6-15, 11-20...)
@@ -74,6 +99,7 @@ def audio_recording():
         all_frames.append(data)
         #frames5.append(data) #frames5: 6-15, 16-25, 26-35, 36-45, ...
         frames10.append(data) #frames10: 1-10, 11-20, 21-30, 31-40, ...
+
         
         if not recording:
             continue
@@ -83,20 +109,42 @@ def audio_recording():
             frames5.append(data)
 
         if len(frames5) == 10:
+            start = time.time()
+
             # measure latency of this
-            wf = wave.open("test5.wav", 'wb')
-            wf.setnchannels(CHANNELS)
-            wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
-            wf.setframerate(RATE)
-            wf.writeframes(b''.join(frames5))
-            wf.close()
+            
+            #wf = wave.open("test5.wav", 'wb')
+            #wf.setnchannels(CHANNELS)
+            #wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
+            #wf.setframerate(RATE)
+            #wf.writeframes(b''.join(frames5))
+            #wf.close()
             #print('audio saved 5')
+
+            frames5_data = b''.join(frames5)
+            #print(frames5_data)
+            
             frames5 = []
+            
+            numbers = [int.from_bytes(frames5_data[i:i+2], byteorder='little', signed=False) for i in range(0, len(frames5_data), 2)]
+
+            # Normalize integers to range between 0 and 2
+            max_val = max(numbers)
+            min_val = min(numbers)
+            normalized_numbers = [(num - min_val) * 2 / (max_val - min_val) for num in numbers]
+
+            wav = torch.tensor(normalized_numbers, dtype=torch.float32)
+
+            end = time.time()
+            print(end-start)
 
             # it's possible to plug numpy arrays to make the two match. figure
             # out this (if 20-30ms)
-            # A100 might be slow
-            wav = read_audio('test5.wav', sampling_rate=16000)
+            # A100 might be slow at the start, wait patiently
+
+            #wav = read_audio('test5.wav', sampling_rate=16000)
+            #print(wav)
+            #wav = read_audio_from_bytes(frames5_data, sampling_rate=16000)
             window_size_samples = 1536
             speech_probs = []
             for i in range(0, len(wav), window_size_samples):
@@ -109,6 +157,9 @@ def audio_recording():
             all_speech_probs += speech_probs[:10]
             #print(speech_probs)
 
+            #end = time.time()
+            #print(end-start)
+
             flag=True
             for i in speech_probs[:10]:
                 if i > 0.01:
@@ -118,6 +169,7 @@ def audio_recording():
 
  
         if len(frames10) == 10:
+            start = time.time()
             wf = wave.open("test10.wav", 'wb')
             wf.setnchannels(CHANNELS)
             wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
@@ -128,6 +180,11 @@ def audio_recording():
             frames10 = []
 
             wav = read_audio('test10.wav', sampling_rate=16000)
+            
+            end = time.time()
+            print(end-start)
+            
+            
             window_size_samples = 1536
             speech_probs = []
             for i in range(0, len(wav), window_size_samples):
@@ -171,7 +228,7 @@ def stop_recording():
     wf.writeframes(b''.join(all_frames))
     wf.close()
     
-    result = model_whisper.transcribe("recording_all.wav")
+    result = pipe("recording_all.wav")
     print(result['text'])
     recording = False
     #emit('audio_saved', {'filename': filename})

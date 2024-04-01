@@ -82,6 +82,7 @@ frames10 = []
 all_frames = []
 all_speech_probs = []
 recording = False
+BOUNDARY = 0.3 # needs adjusting per device/scenario
 
 def audio_recording():
     global frames5, frames10, all_frames, all_speech_probs, recording
@@ -106,7 +107,6 @@ def audio_recording():
             frames5.append(data)
 
         if len(frames5) == 10:
-            start = time.time()
             frames5_data = b''.join(frames5)
             frames5 = []
             numbers = [int.from_bytes(frames5_data[i:i+2], byteorder='little', signed=False) for i in range(0, len(frames5_data), 2)]
@@ -117,9 +117,6 @@ def audio_recording():
             normalized_numbers = [(num - min_val) * 2 / (max_val - min_val) for num in numbers]
 
             wav = torch.tensor(normalized_numbers, dtype=torch.float32)
-
-            end = time.time()
-            print(end-start)
             
             window_size_samples = 1536
             speech_probs = []
@@ -131,18 +128,13 @@ def audio_recording():
                 speech_probs.append(speech_prob)
             vad_iterator.reset_states()
             all_speech_probs += speech_probs[:10]
-            #print(speech_probs)
 
-            flag=True
-            for i in speech_probs[:10]:
-                if i > 0.01:
-                    flag=False
-            if flag: # stop recording 
+            print(max(speech_probs[:10]))
+            
+            if max(speech_probs[:10]) <= BOUNDARY:
                 stop_recording()
-
  
         if len(frames10) == 10:
-            start = time.time()
             frames10_data = b''.join(frames10)
             frames10 = []
             numbers = [int.from_bytes(frames10_data[i:i+2], byteorder='little', signed=False) for i in range(0, len(frames10_data), 2)]
@@ -153,10 +145,7 @@ def audio_recording():
             normalized_numbers = [(num - min_val) * 2 / (max_val - min_val) for num in numbers]
 
             wav = torch.tensor(normalized_numbers, dtype=torch.float32)
-
-            end = time.time()
-            print(end-start)
-            
+       
             window_size_samples = 1536
             speech_probs = []
             for i in range(0, len(wav), window_size_samples):
@@ -167,13 +156,11 @@ def audio_recording():
                 speech_probs.append(speech_prob)
             vad_iterator.reset_states()
             all_speech_probs += speech_probs[:10]
-            #print(speech_probs)
 
-            flag=True
-            for i in speech_probs[:10]:
-                if i > 0.01:
-                    flag=False
-            if flag: stop_recording()
+            print(max(speech_probs[:10]))
+            
+            if max(speech_probs[:10]) <= BOUNDARY:
+                stop_recording()
 
 @app.route('/')
 def index():

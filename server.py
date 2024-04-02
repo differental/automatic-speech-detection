@@ -77,7 +77,7 @@ def calc_result(counts):
 
 
 def audio_recording():
-    global frames5, frames10, all_speech_probs, fallback
+    global frames5, frames10, all_frames, all_speech_probs, fallback
     audio = pyaudio.PyAudio()
     stream = audio.open(format=FORMAT, channels=CHANNELS,
                         rate=RATE, input=True,

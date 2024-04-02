@@ -232,6 +232,15 @@ def stop_recording():
     global recording
     recording = False
     print("Recording stopped")
+    
+    
+    filename = 'recording_all.wav'
+    wf = wave.open(filename, 'wb')
+    wf.setnchannels(CHANNELS)
+    wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
+    wf.setframerate(RATE)
+    wf.writeframes(b''.join(all_frames))
+    wf.close()
 
     if not fallback:
         while calc_result_running:
@@ -240,13 +249,6 @@ def stop_recording():
         socketio.emit('display_message', final_result)
 
     else:
-        filename = 'recording_all.wav'
-        wf = wave.open(filename, 'wb')
-        wf.setnchannels(CHANNELS)
-        wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
-        wf.setframerate(RATE)
-        wf.writeframes(b''.join(all_frames))
-        wf.close()
         result = pipe("recording_all.wav")
         print(result['text'])
         socketio.emit('display_message', result['text'])

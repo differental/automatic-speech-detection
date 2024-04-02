@@ -1,4 +1,4 @@
 pyvenv/
 *.wav
 __pycache__/
-
+.ipynb_checkpoints/

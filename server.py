@@ -4,6 +4,7 @@ from flask import Flask, render_template
 from flask_socketio import SocketIO
 import pyaudio
 import torch
+import time
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -79,14 +80,14 @@ def calc_result(counts):
 
 
 def audio_recording(stream):
-    global frames5, frames10, all_frames, all_speech_probs, fallback
-    print("Recording started...")
-    # all_speech_probs = []
-    tot_len = 0
-    while True:
-        if not recording:
-            continue
-        data = stream.read(CHUNK)
+    global frames5, frames10, all_frames, all_speech_probs, fallback, tot_len, my_thread
+    
+    def callback(in_data, frame_count, time_info, status):
+        global frames5, frames10, all_frames, all_speech_probs, fallback, tot_len, my_thread
+        print("Getting data")
+        
+        #data = stream.read(CHUNK)
+        data = in_data
         all_frames.append(data)
         # frames5.append(data) #frames5: 6-15, 16-25, 26-35, 36-45, ...
         frames10.append(data)  # frames10: 1-10, 11-20, 21-30, 31-40, ...
@@ -143,7 +144,8 @@ def audio_recording(stream):
             # print(max(speech_probs[:10]))
 
             if max(speech_probs[:10]) <= BOUNDARY:
-                stop_recording()
+                socketio.emit('stop_recording')
+                #stop_recording()
 
             frames5 = []
 
@@ -174,31 +176,48 @@ def audio_recording(stream):
             # print(max(speech_probs[:10]))
 
             if max(speech_probs[:10]) <= BOUNDARY:
-                stop_recording()
+                socketio.emit('stop_recording')
+                #stop_recording()
 
             frames10 = []
+        
+        return (in_data, pyaudio.paContinue)  
+    
+    
+    stream = audio.open(format=FORMAT,
+                        channels=CHANNELS,
+                        rate=RATE,
+                        frames_per_buffer=CHUNK,
+                        input=True,
+                        stream_callback=callback)
+    print("Recording started...")
+    # all_speech_probs = []
+    tot_len = 0
+    my_thread = None
+    stream.start_stream()
+    while recording:
+        # Sleep to prevent CPU hogging
+        time.sleep(0.1)
+
+    stream.stop_stream()
+    stream.close()
 
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-
 @socketio.on('start_recording')
 def start_recording():
+    print("Starting recording")
     global frames5, frames10, all_frames, recording, stream
     frames5 = []  # Clear existing frames
     frames10 = []
     all_frames = []
     recording = True
     if stream is None:
-        stream = audio.open(format=FORMAT,
-                        channels=CHANNELS,
-                        rate=RATE,
-                        frames_per_buffer=CHUNK,
-                        input=True,
-                        stream_callback=callback)
         socketio.emit('stream_started')
+        print("Recording started")
         threading.Thread(target=audio_recording, args=(stream,)).start()
     else:
         print("Audio stream already started")
@@ -214,6 +233,7 @@ def stop_recording():
         while calc_result_running:
             continue
         print(final_result)
+        socketio.emit('display_message', final_result)
 
     else:
         filename = 'recording_all.wav'
@@ -225,19 +245,7 @@ def stop_recording():
         wf.close()
         result = pipe("recording_all.wav")
         print(result['text'])
-
-@socketio.on('stream_audio')
-def handle_stream_audio(data):
-    stream = audio.open(format=FORMAT,
-                        channels=CHANNELS,
-                        rate=RATE,
-                        output=True,
-                        frames_per_buffer=CHUNK)
-
-    while True:
-        audio_data = data['audio']
-        stream.write(audio_data)
-
+        socketio.emit('display_message', result['text'])
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

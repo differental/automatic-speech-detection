@@ -1,11 +1,12 @@
 #!apt install portaudio19-dev
-#!pip install pyaudio wave torch matplotlib numpy transformers accelerate
+#!pip install pyaudio wave torch matplotlib numpy transformers accelerate ctypes
 # Restart runtime after installing accelerate
 
 import pyaudio
 import wave
 import threading
 import torch
+import ctypes
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -54,43 +55,28 @@ recording = False
 BOUNDARY = 0.2
 
 final_result = ""
-final_result_lock = threading.Lock()
 
-calc_result5_started = 0
-calc_result5_finished = 0
-calc_result5_started_lock = threading.Lock()
-calc_result5_finished_lock = threading.Lock()
-
-count_5 = 0
+calc_result_running = False
+calc_result_lock = threading.Lock()
 
 def calc_result(counts):
-    global final_result, calc_result5_started, calc_result5_finished
+    global calc_result_running, final_result
     
-    with calc_result5_started_lock:
-        temp = calc_result5_started
-        calc_result5_started += 1
+    calc_result_running = True
     
-    filename = "test_" + str(counts) + ".wav"
+    with calc_result_lock:
     
-    while calc_result5_started - calc_result5_finished > 2:
-        continue
+        filename = "test_" + str(counts) + ".wav"    
+        result = pipe(filename)
+
+        final_result = result["text"]
     
-    result = pipe(filename)
+    calc_result_running = False
     
-    while calc_result5_finished < temp:
-        continue
-    
-    with final_result_lock:
-        final_result += result["text"]
-    
-    with calc_result5_finished_lock:
-        calc_result5_finished += 1
-        
+           
 def audio_recording():
-    global frames5, frames10, all_frames, all_speech_probs, recording, count_5, count_10
-    
-    
-    
+    global frames5, frames10, all_frames, all_speech_probs, recording
+
     # Open the audio file
     file_path = "recording_test.wav"
     audio_file = wave.open(file_path, 'rb')
@@ -113,15 +99,20 @@ def audio_recording():
         if tot_len >= 6:
             frames5.append(data)
             
-        if tot_len % 50 == 0:
+        if tot_len % 10 == 0:
             filename = "test_" + str(tot_len) + ".wav"
             wf = wave.open(filename, 'wb')
             wf.setnchannels(CHANNELS)
             wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
             wf.setframerate(RATE)
-            wf.writeframes(b''.join(all_frames[-50:]))
+            wf.writeframes(b''.join(all_frames))
             wf.close()
-            threading.Thread(target=calc_result, args=(tot_len,)).start()
+            #if calc_result_running and my_thread and my_thread.is_alive():
+                #print("Killing thread: " + str(my_thread.ident))
+                #ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(my_thread.ident), ctypes.py_object(SystemExit))
+            my_thread = threading.Thread(target=calc_result, args=(tot_len,))
+            #print("Running new thread")
+            my_thread.start()
             
         if len(frames5) == 10:
             frames5_data = b''.join(frames5)
@@ -141,18 +132,7 @@ def audio_recording():
             vad_iterator.reset_states()
             all_speech_probs += speech_probs[:10]
             
-            if max(speech_probs[:10]) <= BOUNDARY:
-                
-                if tot_len % 30 >= 5: #>.5s audio to save in the end
-                    filename = "test_" + str(tot_len) + ".wav"
-                    wf = wave.open(filename, 'wb')
-                    wf.setnchannels(CHANNELS)
-                    wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
-                    wf.setframerate(RATE)
-                    wf.writeframes(b''.join(all_frames[-tot_len%30:]))
-                    wf.close()
-                    threading.Thread(target=calc_result, args=(tot_len,)).start()
-                              
+            if max(speech_probs[:10]) <= BOUNDARY:           
                 stop_recording()
             
             frames5 = []
@@ -175,21 +155,11 @@ def audio_recording():
             vad_iterator.reset_states()
             all_speech_probs += speech_probs[:10]
             
-            if max(speech_probs[:10]) <= BOUNDARY:
-                
-                if tot_len % 30 >= 5: #>.5s audio to save in the end
-                    filename = "test_" + str(tot_len) + ".wav"
-                    wf = wave.open(filename, 'wb')
-                    wf.setnchannels(CHANNELS)
-                    wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
-                    wf.setframerate(RATE)
-                    wf.writeframes(b''.join(all_frames[-tot_len%30:]))
-                    wf.close()
-                    threading.Thread(target=calc_result, args=(tot_len,)).start()
-                              
+            if max(speech_probs[:10]) <= BOUNDARY:         
                 stop_recording()
             
             frames10 = []
+            
         data = audio_file.readframes(CHUNK)
 
     stop_recording()
@@ -200,16 +170,16 @@ def start_recording():
     frames10 = []
     all_frames = []
     recording = True
-    my_thread = threading.Thread(target=audio_recording)
-    my_thread.start()
-    my_thread.join()
+    main_thread = threading.Thread(target=audio_recording)
+    main_thread.start()
+    main_thread.join()
 
 def stop_recording():
     global recording
     print("Recording stopped...")
     recording = False
     
-    while calc_result5_started != calc_result5_finished:
+    while calc_result_running:
         continue
     
     print("[Threaded] " + final_result)

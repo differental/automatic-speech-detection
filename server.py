@@ -113,7 +113,7 @@ def audio_recording(stream):
             if not fallback:
                 my_thread = threading.Thread(
                     target=calc_result, args=(tot_len,))
-                # print("Running new thread")
+                print("Running new thread")
                 my_thread.start()
 
         # 200-250ms intervals fed into vad is usually good

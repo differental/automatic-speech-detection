@@ -125,7 +125,10 @@ def audio_recording(stream):
             # Normalize integers to range between 0 and 2
             max_val = max(numbers)
             min_val = min(numbers)
-            normalized_numbers = [(num - min_val) * 2 / (max_val - min_val) for num in numbers]
+            if max_val == min_val:
+                normalized_numbers = [2 for num in numbers]
+            else:
+                normalized_numbers = [(num - min_val) * 2 / (max_val - min_val) for num in numbers]
 
             wav = torch.tensor(normalized_numbers, dtype=torch.float32)
 
@@ -156,7 +159,10 @@ def audio_recording(stream):
             # Normalize integers to range between 0 and 2
             max_val = max(numbers)
             min_val = min(numbers)
-            normalized_numbers = [(num - min_val) * 2 / (max_val - min_val) for num in numbers]
+            if max_val == min_val:
+                normalized_numbers = [2 for num in numbers]
+            else:
+                normalized_numbers = [(num - min_val) * 2 / (max_val - min_val) for num in numbers]
 
             wav = torch.tensor(normalized_numbers, dtype=torch.float32)
 

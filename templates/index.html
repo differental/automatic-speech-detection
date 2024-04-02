@@ -4,24 +4,55 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audio Recorder</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.2/socket.io.js"></script>
-    <script>
-        var socket = io.connect('http://' + document.domain + ':' + location.port);
-        function startRecording() {
-            socket.emit('start_recording');
-        }
-        function stopRecording() {
-            socket.emit('stop_recording');
-        }
-        socket.on('audio_saved', function(data) {
-            alert('Audio saved as ' + data.filename);
-        });
-    </script>
 </head>
 <body>
     <h1>Audio Recorder</h1>
-    <button onclick="startRecording()">Start Recording</button>
-    <button onclick="stopRecording()">Stop Recording</button>
+    <button id="startButton">Start Recording</button>
+    <button id="stopButton" disabled>Stop Recording</button>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.2.0/socket.io.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const startButton = document.getElementById('startButton');
+            const stopButton = document.getElementById('stopButton');
+            let mediaRecorder;
+            let chunks = [];
+
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(function (stream) {
+                    startButton.addEventListener('click', startRecording);
+                    stopButton.addEventListener('click', stopRecording);
+
+                    mediaRecorder = new MediaRecorder(stream);
+
+                    mediaRecorder.ondataavailable = function (e) {
+                        chunks.push(e.data);
+                    };
+
+                    mediaRecorder.onstop = function (e) {
+                        const audioBlob = new Blob(chunks, { type: 'audio/wav' });
+                        socket.emit('audio', audioBlob);
+                        chunks = [];
+                    };
+                })
+                .catch(function (err) {
+                    console.log('The following error occurred: ' + err);
+                });
+
+            const socket = io();
+        });
+
+        function startRecording() {
+            chunks = [];
+            mediaRecorder.start();
+            document.getElementById('startButton').disabled = true;
+            document.getElementById('stopButton').disabled = false;
+        }
+
+        function stopRecording() {
+            mediaRecorder.stop();
+            document.getElementById('startButton').disabled = false;
+            document.getElementById('stopButton').disabled = true;
+        }
+    </script>
 </body>
 </html>
-

@@ -62,6 +62,8 @@ final_result = ""
 calc_result_running = False
 fallback = False
 
+audio = pyaudio.PyAudio()
+stream = None
 
 def calc_result(counts):
     global calc_result_running, final_result
@@ -76,12 +78,8 @@ def calc_result(counts):
     calc_result_running = False
 
 
-def audio_recording():
+def audio_recording(stream):
     global frames5, frames10, all_frames, all_speech_probs, fallback
-    audio = pyaudio.PyAudio()
-    stream = audio.open(format=FORMAT, channels=CHANNELS,
-                        rate=RATE, input=True,
-                        frames_per_buffer=CHUNK)
     print("Recording started...")
     # all_speech_probs = []
     tot_len = 0
@@ -188,12 +186,22 @@ def index():
 
 @socketio.on('start_recording')
 def start_recording():
-    global frames5, frames10, all_frames, recording
+    global frames5, frames10, all_frames, recording, stream
     frames5 = []  # Clear existing frames
     frames10 = []
     all_frames = []
     recording = True
-    threading.Thread(target=audio_recording).start()
+    if stream is None:
+        stream = audio.open(format=FORMAT,
+                        channels=CHANNELS,
+                        rate=RATE,
+                        frames_per_buffer=CHUNK,
+                        input=True,
+                        stream_callback=callback)
+        socketio.emit('stream_started')
+        threading.Thread(target=audio_recording, args=(stream,)).start()
+    else:
+        print("Audio stream already started")
 
 
 @socketio.on('stop_recording')
@@ -217,6 +225,18 @@ def stop_recording():
         wf.close()
         result = pipe("recording_all.wav")
         print(result['text'])
+
+@socketio.on('stream_audio')
+def handle_stream_audio(data):
+    stream = audio.open(format=FORMAT,
+                        channels=CHANNELS,
+                        rate=RATE,
+                        output=True,
+                        frames_per_buffer=CHUNK)
+
+    while True:
+        audio_data = data['audio']
+        stream.write(audio_data)
 
 
 if __name__ == '__main__':

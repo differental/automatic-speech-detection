@@ -256,4 +256,5 @@ def stop_recording():
         socketio.emit('display_message', result['text'])
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0')
+    # For development only, use SSL context for HTTPS
+    socketio.run(app, ssl_context=("cert.pem", "key.pem"), debug=True, host='0.0.0.0')

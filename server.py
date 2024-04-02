@@ -6,6 +6,7 @@ import pyaudio
 import torch
 import time
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
+from flask_cors import CORS
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
@@ -43,6 +44,7 @@ vad_iterator = VADIterator(model)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app)
+cors = CORS(app)
 
 FORMAT = pyaudio.paInt16
 CHANNELS = 1

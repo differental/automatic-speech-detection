@@ -58,7 +58,7 @@ frames10 = []
 all_frames = []
 all_speech_probs = []
 recording = False
-BOUNDARY = 0.2 # needs adjusting per device/scenario
+BOUNDARY = 0.3 # needs adjusting per device/scenario
 
 final_result = ""
 final_result_lock = threading.Lock()
@@ -77,7 +77,7 @@ def calc_result(counts):
     
     filename = "test_" + str(counts) + ".wav"
     
-    while calc_result_started - calc_result_finished > 2:
+    while calc_result_started - calc_result_finished > 40: #Scale up accordingly
         continue
     
     result = pipe(filename)
@@ -112,13 +112,13 @@ def audio_recording():
         if tot_len >= 6:
             frames5.append(data)
             
-        if tot_len % 50 == 0:
+        if tot_len % 30 == 0:
             filename = "test_" + str(tot_len) + ".wav"
             wf = wave.open(filename, 'wb')
             wf.setnchannels(CHANNELS)
             wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
             wf.setframerate(RATE)
-            wf.writeframes(b''.join(all_frames[-50:]))
+            wf.writeframes(b''.join(all_frames[-30:]))
             wf.close()
             threading.Thread(target=calc_result, args=(tot_len,)).start()
             
@@ -148,6 +148,17 @@ def audio_recording():
             print(max(speech_probs[:10]))
             
             if max(speech_probs[:10]) <= BOUNDARY:
+                
+                if tot_len % 30 >= 5: #>.5s audio to save in the end
+                    filename = "test_" + str(tot_len) + ".wav"
+                    wf = wave.open(filename, 'wb')
+                    wf.setnchannels(CHANNELS)
+                    wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
+                    wf.setframerate(RATE)
+                    wf.writeframes(b''.join(all_frames[-tot_len%30:]))
+                    wf.close()
+                    threading.Thread(target=calc_result, args=(tot_len,)).start()
+                              
                 stop_recording()
 
             frames5 = []
@@ -177,6 +188,17 @@ def audio_recording():
             print(max(speech_probs[:10]))
             
             if max(speech_probs[:10]) <= BOUNDARY:
+                
+                if tot_len % 30 >= 5: #>.5s audio to save in the end
+                    filename = "test_" + str(tot_len) + ".wav"
+                    wf = wave.open(filename, 'wb')
+                    wf.setnchannels(CHANNELS)
+                    wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
+                    wf.setframerate(RATE)
+                    wf.writeframes(b''.join(all_frames[-tot_len%30:]))
+                    wf.close()
+                    threading.Thread(target=calc_result, args=(tot_len,)).start()
+                              
                 stop_recording()
             
             frames10 = []
@@ -203,19 +225,19 @@ def stop_recording():
     while calc_result_started != calc_result_finished:
         continue
     
-    print("Threaded" + final_result)
+    print(final_result)
     
     
-    filename = 'recording_all.wav'
-    wf = wave.open(filename, 'wb')
-    wf.setnchannels(CHANNELS)
-    wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
-    wf.setframerate(RATE)
-    wf.writeframes(b''.join(all_frames))
-    wf.close()
+    #filename = 'recording_all.wav'
+    #wf = wave.open(filename, 'wb')
+    #wf.setnchannels(CHANNELS)
+    #wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
+    #wf.setframerate(RATE)
+    #wf.writeframes(b''.join(all_frames))
+    #wf.close()
     
-    result = pipe("recording_all.wav")
-    print("Single" + result['text'])
+    #result = pipe("recording_all.wav")
+    #print("Single" + result['text'])
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

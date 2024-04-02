@@ -1,12 +1,9 @@
-from flask import Flask, render_template
-from flask_socketio import SocketIO, emit
-import pyaudio
 import wave
 import threading
+from flask import Flask, render_template
+from flask_socketio import SocketIO
+import pyaudio
 import torch
-import numpy as np
-import ctypes
-
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -51,57 +48,55 @@ CHANNELS = 1
 RATE = 16000
 CHUNK = 1536
 
-#1 frame: 1024/44100=23ms
-#10 frames together, send in 5 frame intervals (1-10, 6-15, 11-20...)
+# 1 frame: 1024/44100=23ms
+# 10 frames together, send in 5 frame intervals (1-10, 6-15, 11-20...)
 
 frames5 = []
 frames10 = []
 all_frames = []
 all_speech_probs = []
 recording = False
-BOUNDARY = 0.3 # needs adjusting per device/scenario
+BOUNDARY = 0.3  # needs adjusting per device/scenario
 
 final_result = ""
-
 calc_result_running = False
-
-
 fallback = False
 
 
 def calc_result(counts):
     global calc_result_running, final_result
-    
+
     calc_result_running = True
-    
-    filename = "test_" + str(counts) + ".wav"    
+
+    filename = "test_" + str(counts) + ".wav"
     result = pipe(filename)
 
     final_result = result["text"]
-    
+
     calc_result_running = False
-    
+
+
 def audio_recording():
-    global frames5, frames10, all_frames, all_speech_probs, recording, fallback
+    global frames5, frames10, all_speech_probs, fallback
     audio = pyaudio.PyAudio()
     stream = audio.open(format=FORMAT, channels=CHANNELS,
                         rate=RATE, input=True,
                         frames_per_buffer=CHUNK)
     print("Recording started...")
-    #all_speech_probs = []
+    # all_speech_probs = []
     tot_len = 0
     while True:
         if not recording:
             continue
         data = stream.read(CHUNK)
         all_frames.append(data)
-        #frames5.append(data) #frames5: 6-15, 16-25, 26-35, 36-45, ...
-        frames10.append(data) #frames10: 1-10, 11-20, 21-30, 31-40, ...
-        
+        # frames5.append(data) #frames5: 6-15, 16-25, 26-35, 36-45, ...
+        frames10.append(data)  # frames10: 1-10, 11-20, 21-30, 31-40, ...
+
         tot_len += 1
         if tot_len >= 6:
             frames5.append(data)
-            
+
         if tot_len % 10 == 0 and not fallback:
             filename = "test_" + str(tot_len) + ".wav"
             wf = wave.open(filename, 'wb')
@@ -114,29 +109,32 @@ def audio_recording():
                 if my_thread.is_alive():
                     fallback = True
                     print("Falling back to processing after finish.")
-                #print("Killing thread: " + str(my_thread.ident))
-                #ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(my_thread.ident), ctypes.py_object(SystemExit))
+                # print("Killing thread: " + str(my_thread.ident))
+                # ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(my_thread.ident), ctypes.py_object(SystemExit))
             if not fallback:
-                my_thread = threading.Thread(target=calc_result, args=(tot_len,))
-                #print("Running new thread")
+                my_thread = threading.Thread(
+                    target=calc_result, args=(tot_len,))
+                # print("Running new thread")
                 my_thread.start()
-            
+
         # 200-250ms intervals fed into vad is usually good
         if len(frames5) == 10:
             frames5_data = b''.join(frames5)
-            numbers = [int.from_bytes(frames5_data[i:i+2], byteorder='little', signed=False) for i in range(0, len(frames5_data), 2)]
+            numbers = [int.from_bytes(frames5_data[i:i+2], byteorder='little', signed=False)
+                       for i in range(0, len(frames5_data), 2)]
 
             # Normalize integers to range between 0 and 2
             max_val = max(numbers)
             min_val = min(numbers)
-            normalized_numbers = [(num - min_val) * 2 / (max_val - min_val) for num in numbers]
+            normalized_numbers = [(num - min_val) * 2 /
+                                  (max_val - min_val) for num in numbers]
 
             wav = torch.tensor(normalized_numbers, dtype=torch.float32)
-            
+
             window_size_samples = 1536
             speech_probs = []
             for i in range(0, len(wav), window_size_samples):
-                chunk = wav[i: i+ window_size_samples]
+                chunk = wav[i: i + window_size_samples]
                 if len(chunk) < window_size_samples:
                     break
                 speech_prob = model(chunk, 16000).item()
@@ -144,28 +142,30 @@ def audio_recording():
             vad_iterator.reset_states()
             all_speech_probs += speech_probs[:10]
 
-            #print(max(speech_probs[:10]))
-            
+            # print(max(speech_probs[:10]))
+
             if max(speech_probs[:10]) <= BOUNDARY:
                 stop_recording()
 
             frames5 = []
-            
+
         if len(frames10) == 10:
             frames10_data = b''.join(frames10)
-            numbers = [int.from_bytes(frames10_data[i:i+2], byteorder='little', signed=False) for i in range(0, len(frames10_data), 2)]
+            numbers = [int.from_bytes(frames10_data[i:i+2], byteorder='little', signed=False)
+                       for i in range(0, len(frames10_data), 2)]
 
             # Normalize integers to range between 0 and 2
             max_val = max(numbers)
             min_val = min(numbers)
-            normalized_numbers = [(num - min_val) * 2 / (max_val - min_val) for num in numbers]
+            normalized_numbers = [(num - min_val) * 2 /
+                                  (max_val - min_val) for num in numbers]
 
             wav = torch.tensor(normalized_numbers, dtype=torch.float32)
-       
+
             window_size_samples = 1536
             speech_probs = []
             for i in range(0, len(wav), window_size_samples):
-                chunk = wav[i: i+ window_size_samples]
+                chunk = wav[i: i + window_size_samples]
                 if len(chunk) < window_size_samples:
                     break
                 speech_prob = model(chunk, 16000).item()
@@ -173,16 +173,18 @@ def audio_recording():
             vad_iterator.reset_states()
             all_speech_probs += speech_probs[:10]
 
-            #print(max(speech_probs[:10]))
-            
+            # print(max(speech_probs[:10]))
+
             if max(speech_probs[:10]) <= BOUNDARY:
                 stop_recording()
-            
+
             frames10 = []
+
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
 
 @socketio.on('start_recording')
 def start_recording():
@@ -193,17 +195,18 @@ def start_recording():
     recording = True
     threading.Thread(target=audio_recording).start()
 
+
 @socketio.on('stop_recording')
 def stop_recording():
     global recording
     recording = False
     print("Recording stopped")
-    
+
     if not fallback:
         while calc_result_running:
             continue
         print(final_result)
-    
+
     else:
         filename = 'recording_all.wav'
         wf = wave.open(filename, 'wb')
@@ -214,6 +217,7 @@ def stop_recording():
         wf.close()
         result = pipe("recording_all.wav")
         print(result['text'])
+
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

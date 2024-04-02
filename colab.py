@@ -142,6 +142,17 @@ def audio_recording():
             all_speech_probs += speech_probs[:10]
             
             if max(speech_probs[:10]) <= BOUNDARY:
+                
+                if tot_len % 30 >= 5: #>.5s audio to save in the end
+                    filename = "test_" + str(tot_len) + ".wav"
+                    wf = wave.open(filename, 'wb')
+                    wf.setnchannels(CHANNELS)
+                    wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
+                    wf.setframerate(RATE)
+                    wf.writeframes(b''.join(all_frames[-tot_len%30:]))
+                    wf.close()
+                    threading.Thread(target=calc_result, args=(tot_len,)).start()
+                              
                 stop_recording()
             
             frames5 = []
@@ -165,6 +176,17 @@ def audio_recording():
             all_speech_probs += speech_probs[:10]
             
             if max(speech_probs[:10]) <= BOUNDARY:
+                
+                if tot_len % 30 >= 5: #>.5s audio to save in the end
+                    filename = "test_" + str(tot_len) + ".wav"
+                    wf = wave.open(filename, 'wb')
+                    wf.setnchannels(CHANNELS)
+                    wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
+                    wf.setframerate(RATE)
+                    wf.writeframes(b''.join(all_frames[-tot_len%30:]))
+                    wf.close()
+                    threading.Thread(target=calc_result, args=(tot_len,)).start()
+                              
                 stop_recording()
             
             frames10 = []

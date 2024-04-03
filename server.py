@@ -1,3 +1,6 @@
+# apt install portaudio19-dev
+# pip install accelerate wave flask flask_socketio flask_cors pyaudio torch transformers
+# Might need restart after installing accelerate
 import wave
 import threading
 from flask import Flask, render_template

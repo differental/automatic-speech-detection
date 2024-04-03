@@ -17,7 +17,7 @@
         document.addEventListener('DOMContentLoaded', function () {
             const startButton = document.getElementById('startButton');
             const stopButton = document.getElementById('stopButton');
-            const socket = io('https://34.34.27.143:5000');
+            const socket = io();
             let mediaRecorder;
             let audioChunks = [];
 
@@ -35,6 +35,7 @@
                         mediaRecorder.onstop = function () {
                             const audioBlob = new Blob(audioChunks);
                             socket.emit('audio', audioBlob);
+                            console.log(audioBlob.size)
                             audioChunks = [];
                         };
                         mediaRecorder.start();
@@ -67,11 +68,14 @@
 
             socket.on('stream_started', function () {
                 console.log('Server started audio stream');
-                // Update UI or perform actions as needed
             });
 
             socket.on('display_message', function(message){
                 $('#messageContainer').text(message);
+            });
+
+            socket.on('audio_received', function() {
+                console.log('Audio blob received');
             });
         });
     </script>

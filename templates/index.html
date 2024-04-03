@@ -3,25 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audio Recorder</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.2/socket.io.js"></script>
-    <script>
-        var socket = io.connect('http://' + document.domain + ':' + location.port);
-        function startRecording() {
-            socket.emit('start_recording');
-        }
-        function stopRecording() {
-            socket.emit('stop_recording');
-        }
-        socket.on('audio_saved', function(data) {
-            alert('Audio saved as ' + data.filename);
-        });
-    </script>
+    <title>Record Audio</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
 <body>
-    <h1>Audio Recorder</h1>
-    <button onclick="startRecording()">Start Recording</button>
-    <button onclick="stopRecording()">Stop Recording</button>
+    <button id="start">Start Recording</button>
+    <br/><br/>
+    <div id="messageContainer"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.2/socket.io.js"></script>
+    <script src="https://cdn.webrtc-experiment.com/RecordRTC.js"></script>
+
+    <script>
+        const socket = io();
+        let recorder;
+
+        startButton = document.getElementById('start');
+        startButton.addEventListener('click', startRecording);
+
+        async function startRecording(){
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+            recorder = new RecordRTC(stream, {
+                type: 'audio',
+                mimeType: 'audio/wav',
+                recorderType: RecordRTC.StereoAudioRecorder,
+                timeSlice: 50,
+                desiredSampRate: 16000,
+                numberOfAudioChannels: 1,
+                bufferSize: 16384,
+                audioBitsPerSecond: 16000,
+                ondataavailable: async (blob) => {
+                    if (socket.connected) {
+                        console.log('Sending data, size:', blob.size, 'bytes');
+                        socket.emit('audio_data', blob);
+                    }
+                }
+            });
+            socket.emit('start_recording');
+            recorder.startRecording();
+            startButton.disabled = true;
+        }
+        async function stopRecording(){
+            recorder.stopRecording();
+            startButton.disabled = false;
+            socket.emit('stop_recording');
+        };
+        socket.on('start_recording', function () {
+            console.log('Server started recording');
+        });
+        socket.on('stop_recording', function () {
+            console.log('Server stopped recording');
+            stopRecording();
+        });
+        socket.on('audio_received', function () {
+            console.log('Server received audio');
+        });
+        socket.on('transcription_available', function (message) {
+            console.log('Transcription received');
+            $('#messageContainer').text(message);
+        });
+    </script>
 </body>
 </html>
-

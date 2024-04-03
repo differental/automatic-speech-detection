@@ -17,7 +17,7 @@
         document.addEventListener('DOMContentLoaded', function () {
             const startButton = document.getElementById('startButton');
             const stopButton = document.getElementById('stopButton');
-            const socket = io('https://34.34.27.143:5000');
+            const socket = io();
             let mediaRecorder;
             let audioChunks = [];
 

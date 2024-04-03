@@ -107,13 +107,18 @@ def handle_audio_data(data):
     # frames5.append(data) #frames5: 6-15, 16-25, 26-35, 36-45, ...
     frames10.append(data)  # frames10: 1-10, 11-20, 21-30, 31-40, ...
 
+
+    # Update: Now, one frame is approximately 250ms...
+    # frames5: 2-3, 4-5, 6-7...
+    # frames10: 1-2, 3-4, 5-6...
+
     tot_len += 1
     local_len = tot_len
 
-    if local_len >= 6:
+    if local_len >= 2:
         frames5.append(data)
 
-    if local_len % 10 == 0 and not fallback:
+    if local_len % 4 == 0 and not fallback:
         filename = "test_" + str(local_len) + ".wav"
         wf = wave.open(filename, 'wb')
         wf.setnchannels(CHANNELS)
@@ -132,7 +137,7 @@ def handle_audio_data(data):
             my_thread.start()
 
     # 200-250ms intervals fed into vad is usually good
-    if len(frames5) == 10:
+    if len(frames5) == 2:
         frames5_data = b''.join(frames5)
         numbers = [int.from_bytes(frames5_data[i:i+2], byteorder='little', signed=False)
                     for i in range(0, len(frames5_data), 2)]
@@ -156,6 +161,7 @@ def handle_audio_data(data):
         vad_iterator.reset_states()
         all_speech_probs += speech_probs[:10]
 
+        print(speech_probs)
         print(max(speech_probs[:10]))
 
         if max(speech_probs[:10]) <= BOUNDARY:
@@ -165,7 +171,7 @@ def handle_audio_data(data):
 
         frames5 = []
 
-    if len(frames10) == 10:
+    if len(frames10) == 2:
         frames10_data = b''.join(frames10)
         numbers = [int.from_bytes(frames10_data[i:i+2], byteorder='little', signed=False)
                     for i in range(0, len(frames10_data), 2)]

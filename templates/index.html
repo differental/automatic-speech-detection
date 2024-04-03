@@ -17,6 +17,7 @@
     <script>
         const socket = io();
         let recorder;
+        let count=0;
 
         startButton = document.getElementById('start');
         startButton.addEventListener('click', startRecording);
@@ -28,14 +29,15 @@
                 type: 'audio',
                 mimeType: 'audio/wav',
                 recorderType: RecordRTC.StereoAudioRecorder,
-                timeSlice: 50,
+                timeSlice: 5,
                 desiredSampRate: 16000,
                 numberOfAudioChannels: 1,
                 bufferSize: 16384,
                 audioBitsPerSecond: 16000,
                 ondataavailable: async (blob) => {
                     if (socket.connected) {
-                        console.log('Sending data, size:', blob.size, 'bytes');
+                        count += 1;
+                        console.log('Sending data, size:', blob.size, 'bytes, count:', count);
                         socket.emit('audio_data', blob);
                     }
                 }

@@ -32,7 +32,7 @@ pipe = pipeline(
 
 model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
                               model='silero_vad',
-                              force_reload=False,
+                              force_reload=True,
                               onnx=False)
 (get_speech_timestamps,
  save_audio,
@@ -81,15 +81,8 @@ def calc_result(counts):
     calc_result_running = False
 
 
-@socketio.on('audio')
-def handle_audio(audio_blob):
-    socketio.emit('audio_received')
-    print(audio_blob)
-    print("Audio received")
-
-
-def audio_recording():
-    global frames5, frames10, all_frames, all_speech_probs, fallback, tot_len, my_thread, stream
+def audio_recording(stream):
+    global frames5, frames10, all_frames, all_speech_probs, fallback, tot_len, my_thread
     
     def callback(in_data, frame_count, time_info, status):
         global frames5, frames10, all_frames, all_speech_probs, fallback, tot_len, my_thread
@@ -231,7 +224,7 @@ def start_recording():
     if stream is None:
         socketio.emit('stream_started')
         print("Recording started")
-        threading.Thread(target=audio_recording, args=()).start()
+        threading.Thread(target=audio_recording, args=(stream,)).start()
     else:
         print("Audio stream already started")
 

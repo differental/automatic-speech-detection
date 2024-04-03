@@ -2,6 +2,7 @@ import wave
 import threading
 from flask import Flask, render_template
 from flask_socketio import SocketIO
+from flask_cors import CORS
 import pyaudio
 import torch
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
@@ -41,6 +42,7 @@ vad_iterator = VADIterator(model)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
+CORS(app)
 socketio = SocketIO(app)
 
 FORMAT = pyaudio.paInt16
@@ -328,4 +330,5 @@ def stop_recording():
         socketio.emit('transcription_available', result['text'])
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0')
+    # For testing only, self-signed certificates
+    socketio.run(app, ssl_context=("cert.pem", "key.pem"), debug=True, host='0.0.0.0')

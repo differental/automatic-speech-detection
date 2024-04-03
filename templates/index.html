@@ -27,17 +27,29 @@
             function startRecording() {
                 navigator.mediaDevices.getUserMedia({ audio: true })
                     .then(function (stream) {
+                        const options = {
+                            mimeType: 'audio/webm',
+                            audioBitsPerSecond : 16000,
+                            audioBitrateMode: 'constant',
+
+                            // you can add more options as needed
+                        };
                         socket.emit('start_recording');
-                        mediaRecorder = new MediaRecorder(stream);
+                        mediaRecorder = new MediaRecorder(stream, options);
                         mediaRecorder.ondataavailable = function (e) {
-                            audioChunks.push(e.data);
+                            //audioChunks.push(e.data);
+                            const audioBlob = new Blob([e.data]);
+                            console.log("Data available")
+                            console.log(audioBlob.size);
+                            socket.emit('audio', e.data);
+                            //socket.emit('audio', audioBlob);
                         };
-                        mediaRecorder.onstop = function () {
-                            const audioBlob = new Blob(audioChunks);
-                            socket.emit('audio', audioBlob);
-                            console.log(audioBlob.size)
-                            audioChunks = [];
-                        };
+                        //mediaRecorder.onstop = function () {
+                        //    const audioBlob = new Blob(audioChunks);
+                        //    socket.emit('audio', audioBlob);
+                        //    console.log(audioBlob.size)
+                        //    audioChunks = [];
+                        //};
                         mediaRecorder.start();
                         startButton.disabled = true;
                         stopButton.disabled = false;

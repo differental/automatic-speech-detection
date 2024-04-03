@@ -32,7 +32,7 @@ pipe = pipeline(
 
 model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
                               model='silero_vad',
-                              force_reload=False,
+                              force_reload=True,
                               onnx=False)
 (get_speech_timestamps,
  save_audio,
@@ -84,7 +84,7 @@ def calc_result(counts):
 @socketio.on('audio')
 def handle_audio(audio_blob):
     socketio.emit('audio_received')
-    print(audio_blob)
+    #print(audio_blob)
     print("Audio received")
 
 
@@ -96,7 +96,7 @@ def audio_recording():
         print("Getting data")
         #data = stream.read(CHUNK)
         data = in_data
-        print(data)
+        #print(data)
         all_frames.append(data)
         # frames5.append(data) #frames5: 6-15, 16-25, 26-35, 36-45, ...
         frames10.append(data)  # frames10: 1-10, 11-20, 21-30, 31-40, ...

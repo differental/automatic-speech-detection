@@ -87,9 +87,9 @@ def audio_recording(stream):
     def callback(in_data, frame_count, time_info, status):
         global frames5, frames10, all_frames, all_speech_probs, fallback, tot_len, my_thread
         print("Getting data")
-        
         #data = stream.read(CHUNK)
         data = in_data
+        print(data)
         all_frames.append(data)
         # frames5.append(data) #frames5: 6-15, 16-25, 26-35, 36-45, ...
         frames10.append(data)  # frames10: 1-10, 11-20, 21-30, 31-40, ...

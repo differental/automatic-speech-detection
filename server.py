@@ -62,7 +62,7 @@ all_frames = []
 all_speech_probs = []
 tot_len = 0
 recording = False
-BOUNDARY = 0.3  # needs adjusting per device/scenario
+BOUNDARY = 0.25  # needs adjusting per device/scenario
 
 final_result = ""
 calc_result_running = False

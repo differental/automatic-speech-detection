@@ -4,75 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Audio Recorder</title>
-</head>
-<body>
-    <h1>Audio Recorder</h1>
-    <button id="startButton">Start Recording</button>
-    <button id="stopButton" disabled>Stop Recording</button>
-    <br/><br/>
-    <div id="messageContainer"></div>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.2.0/socket.io.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.2/socket.io.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const startButton = document.getElementById('startButton');
-            const stopButton = document.getElementById('stopButton');
-            const socket = io();
-            let mediaRecorder;
-            let audioChunks = [];
-
-            startButton.addEventListener('click', startRecording);
-            stopButton.addEventListener('click', stopRecording);
-
-            function startRecording() {
-                navigator.mediaDevices.getUserMedia({ audio: true })
-                    .then(function (stream) {
-                        socket.emit('start_recording');
-                        mediaRecorder = new MediaRecorder(stream);
-                        mediaRecorder.ondataavailable = function (e) {
-                            audioChunks.push(e.data);
-                        };
-                        mediaRecorder.onstop = function () {
-                            const audioBlob = new Blob(audioChunks);
-                            socket.emit('audio', audioBlob);
-                            audioChunks = [];
-                        };
-                        mediaRecorder.start();
-                        startButton.disabled = true;
-                        stopButton.disabled = false;
-                    })
-                    .catch(function (err) {
-                        console.error('Error accessing microphone:', err);
-                    });
-            }
-
-            function stopRecording() {
-                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                    mediaRecorder.stop();
-                    startButton.disabled = false;
-                    stopButton.disabled = true;
-                    socket.emit('stop_recording');
-                }
-            }
-
-            socket.on('start_recording', function () {
-                console.log('Server started recording');
-                startRecording();
-            });
-
-            socket.on('stop_recording', function () {
-                console.log('Server stopped recording');
-                stopRecording();
-            });
-
-            socket.on('stream_started', function () {
-                console.log('Server started audio stream');
-                // Update UI or perform actions as needed
-            });
-
-            socket.on('display_message', function(message){
-                $('#messageContainer').text(message);
-            });
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+        function startRecording() {
+            socket.emit('start_recording');
+        }
+        function stopRecording() {
+            socket.emit('stop_recording');
+        }
+        socket.on('audio_saved', function(data) {
+            alert('Audio saved as ' + data.filename);
         });
     </script>
 </head>
@@ -82,3 +24,4 @@
     <button onclick="stopRecording()">Stop Recording</button>
 </body>
 </html>
+

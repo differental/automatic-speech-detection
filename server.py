@@ -4,9 +4,7 @@ from flask import Flask, render_template
 from flask_socketio import SocketIO
 import pyaudio
 import torch
-import time
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
-from flask_cors import CORS
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
@@ -44,7 +42,6 @@ vad_iterator = VADIterator(model)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app)
-cors = CORS(app)
 
 FORMAT = pyaudio.paInt16
 CHANNELS = 1
@@ -117,7 +114,7 @@ def audio_recording():
             if not fallback:
                 my_thread = threading.Thread(
                     target=calc_result, args=(tot_len,))
-                print("Running new thread")
+                # print("Running new thread")
                 my_thread.start()
 
         # 200-250ms intervals fed into vad is usually good
@@ -129,10 +126,8 @@ def audio_recording():
             # Normalize integers to range between 0 and 2
             max_val = max(numbers)
             min_val = min(numbers)
-            if max_val == min_val:
-                normalized_numbers = [2 for num in numbers]
-            else:
-                normalized_numbers = [(num - min_val) * 2 / (max_val - min_val) for num in numbers]
+            normalized_numbers = [(num - min_val) * 2 /
+                                  (max_val - min_val) for num in numbers]
 
             wav = torch.tensor(normalized_numbers, dtype=torch.float32)
 
@@ -150,8 +145,7 @@ def audio_recording():
             # print(max(speech_probs[:10]))
 
             if max(speech_probs[:10]) <= BOUNDARY:
-                socketio.emit('stop_recording')
-                #stop_recording()
+                stop_recording()
 
             frames5 = []
 
@@ -163,10 +157,8 @@ def audio_recording():
             # Normalize integers to range between 0 and 2
             max_val = max(numbers)
             min_val = min(numbers)
-            if max_val == min_val:
-                normalized_numbers = [2 for num in numbers]
-            else:
-                normalized_numbers = [(num - min_val) * 2 / (max_val - min_val) for num in numbers]
+            normalized_numbers = [(num - min_val) * 2 /
+                                  (max_val - min_val) for num in numbers]
 
             wav = torch.tensor(normalized_numbers, dtype=torch.float32)
 
@@ -184,36 +176,15 @@ def audio_recording():
             # print(max(speech_probs[:10]))
 
             if max(speech_probs[:10]) <= BOUNDARY:
-                socketio.emit('stop_recording')
-                #stop_recording()
+                stop_recording()
 
             frames10 = []
-        
-        return (in_data, pyaudio.paContinue)  
-    
-    
-    stream = audio.open(format=FORMAT,
-                        channels=CHANNELS,
-                        rate=RATE,
-                        frames_per_buffer=CHUNK,
-                        input=True,
-                        stream_callback=callback)
-    print("Recording started...")
-    # all_speech_probs = []
-    tot_len = 0
-    my_thread = None
-    stream.start_stream()
-    while recording:
-        # Sleep to prevent CPU hogging
-        time.sleep(0.1)
-
-    stream.stop_stream()
-    stream.close()
 
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
 
 @socketio.on('start_recording')
 def start_recording():
@@ -230,27 +201,23 @@ def stop_recording():
     global recording
     recording = False
     print("Recording stopped")
-    
-    
-    filename = 'recording_all.wav'
-    wf = wave.open(filename, 'wb')
-    wf.setnchannels(CHANNELS)
-    wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
-    wf.setframerate(RATE)
-    wf.writeframes(b''.join(all_frames))
-    wf.close()
 
     if not fallback:
         while calc_result_running:
             continue
         print(final_result)
-        socketio.emit('display_message', final_result)
 
     else:
+        filename = 'recording_all.wav'
+        wf = wave.open(filename, 'wb')
+        wf.setnchannels(CHANNELS)
+        wf.setsampwidth(pyaudio.PyAudio().get_sample_size(FORMAT))
+        wf.setframerate(RATE)
+        wf.writeframes(b''.join(all_frames))
+        wf.close()
         result = pipe("recording_all.wav")
         print(result['text'])
 
 
 if __name__ == '__main__':
-    # For development only, use SSL context for HTTPS
-    socketio.run(app, ssl_context=("cert.pem", "key.pem"), debug=True, host='0.0.0.0')
+    socketio.run(app, debug=True)

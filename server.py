@@ -161,8 +161,7 @@ def handle_audio_data(data):
         vad_iterator.reset_states()
         all_speech_probs += speech_probs[:10]
 
-        print(speech_probs)
-        print(max(speech_probs[:10]))
+        #print(max(speech_probs[:10]))
 
         if max(speech_probs[:10]) <= BOUNDARY:
             socketio.emit('stop_recording')
@@ -195,7 +194,7 @@ def handle_audio_data(data):
         vad_iterator.reset_states()
         all_speech_probs += speech_probs[:10]
 
-        print(max(speech_probs[:10]))
+        #print(max(speech_probs[:10]))
 
         if max(speech_probs[:10]) <= BOUNDARY:
             socketio.emit('stop_recording')

@@ -65,8 +65,6 @@ final_result = ""
 calc_result_running = False
 fallback = False
 
-audio = pyaudio.PyAudio()
-stream = None
 
 def calc_result(counts):
     global calc_result_running, final_result
@@ -81,15 +79,19 @@ def calc_result(counts):
     calc_result_running = False
 
 
-def audio_recording(stream):
-    global frames5, frames10, all_frames, all_speech_probs, fallback, tot_len, my_thread
-    
-    def callback(in_data, frame_count, time_info, status):
-        global frames5, frames10, all_frames, all_speech_probs, fallback, tot_len, my_thread
-        print("Getting data")
-        
-        #data = stream.read(CHUNK)
-        data = in_data
+def audio_recording():
+    global frames5, frames10, all_frames, all_speech_probs, fallback
+    audio = pyaudio.PyAudio()
+    stream = audio.open(format=FORMAT, channels=CHANNELS,
+                        rate=RATE, input=True,
+                        frames_per_buffer=CHUNK)
+    print("Recording started...")
+    # all_speech_probs = []
+    tot_len = 0
+    while True:
+        if not recording:
+            continue
+        data = stream.read(CHUNK)
         all_frames.append(data)
         # frames5.append(data) #frames5: 6-15, 16-25, 26-35, 36-45, ...
         frames10.append(data)  # frames10: 1-10, 11-20, 21-30, 31-40, ...
@@ -215,18 +217,12 @@ def index():
 
 @socketio.on('start_recording')
 def start_recording():
-    print("Starting recording")
-    global frames5, frames10, all_frames, recording, stream
+    global frames5, frames10, all_frames, recording
     frames5 = []  # Clear existing frames
     frames10 = []
     all_frames = []
     recording = True
-    if stream is None:
-        socketio.emit('stream_started')
-        print("Recording started")
-        threading.Thread(target=audio_recording, args=(stream,)).start()
-    else:
-        print("Audio stream already started")
+    threading.Thread(target=audio_recording).start()
 
 
 @socketio.on('stop_recording')
@@ -253,7 +249,7 @@ def stop_recording():
     else:
         result = pipe("recording_all.wav")
         print(result['text'])
-        socketio.emit('display_message', result['text'])
+
 
 if __name__ == '__main__':
     # For development only, use SSL context for HTTPS
